@@ -33,7 +33,7 @@ N_TREES=100
 BOOTSTRAP_RATIO=1
 MIN_SAMPLES=2
 MIN_GAIN_RATIO=0.0
-MAX_WORK=4
+MAX_WORK=1
 MAX_DEPTH=None
 #Adaboost
 ADA_LEARNERS=100
@@ -613,7 +613,7 @@ rf_model_bc = train_ensemble(
     n_trees=N_TREES,
     max_depth=None, 
     min_samples=MIN_SAMPLES,
-    min_gain_ratio=MIN_GAIN_RATIO
+    min_gain_ratio=MIN_GAIN_RATIO,
     max_workers=1
 )
 print(f"Build time: {time.time() - t0:.4f}s")
