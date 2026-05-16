@@ -36,8 +36,8 @@ MIN_GAIN_RATIO=0.0
 MAX_WORK=4
 MAX_DEPTH=None
 #Adaboost
-ADA_LEARNERS=50
-ADA_STUMP_DEPTH=1
+ADA_LEARNERS=100
+ADA_STUMP_DEPTH=3
 
 #prep work
 def binaryFlatten(X,limit=BINARY_THRESHOLD):
@@ -484,7 +484,7 @@ def predict_ensemble(model, X):
     else:
         raise ValueError(f"Unknown method in model: {model['method']!r}")
     
-
+"""
  #Test sets
 X_train = load_images("train-images-idx3-ubyte") # training images
 y_train = load_labels("train-labels-idx1-ubyte") # training labels
@@ -500,7 +500,7 @@ plt.show()
 X_train_bin = binaryFlatten(X_train)
 X_test_bin  = binaryFlatten(X_test)
 print(f"After binarization: train={X_train_bin.shape} test={X_test_bin.shape}")
-X_train_bin, y_train = X_train_bin[:2000], y_train[:2000]
+#X_train_bin, y_train = X_train_bin[:2000], y_train[:2000]
 
 #C4.5 Test
 print("\n" + "="*60)
@@ -526,8 +526,8 @@ print("-------- confusion matrix --------")
 print(cm_single)
 plot_confusion_matrix(cm_single, classes, title="Single C4.5 Tree — MNIST")
 
-#Adaboost test
-METHOD_FLAG='adaboost'
+#Adaboost/random forest test
+METHOD_FLAG='random_forest'
 print("\n" + "="*60)
 print(f"PART 2: Ensemble — {METHOD_FLAG}")
 print("="*60)
@@ -548,4 +548,99 @@ plot_confusion_matrix(
     title=f"{METHOD_FLAG.replace('_', ' ').title()} — MNIST"
 )
  
+"""
 
+#extra data stuff
+def load_breast_cancer_dataset(path, train_ratio=0.8):
+    """
+    Loads and preprocesses the Breast Cancer Wisconsin (Original) dataset.
+    Expects the raw 'breast-cancer-wisconsin.data' file.
+    """
+ #treat numpy as NaN
+    data = np.genfromtxt(path, delimiter=",", missing_values="?", filling_values=np.nan)
+    
+    # 2. Drop NaNs
+    data = data[~np.isnan(data).any(axis=1)]
+    
+    # 3. Drop ID column to prevent overfitting
+    data = data[:, 1:]
+    
+    # Shuffle  cleaned data
+    np.random.seed(42) 
+    np.random.shuffle(data)
+    
+    # 4. Split into training and testing sets
+    split = int(len(data) * train_ratio)
+    train, test = data[:split], data[split:]
+    
+    # Separate features (X) and target labels (y)
+    X_tr, y_tr = train[:, :-1], train[:, -1].astype(int)
+    X_te, y_te = test[:, :-1],  test[:, -1].astype(int)
+    
+    return X_tr, X_te, y_tr, y_te
+print("\n" + "="*60)
+print("PART 3: Breast Cancer Dataset Evaluation")
+print("="*60)
+
+X_train_bc, X_test_bc, y_train_bc, y_test_bc = load_breast_cancer_dataset("breast-cancer-wisconsin.data")
+print(f"Loaded Cleaned Data -> Train: {X_train_bc.shape}, Test: {X_test_bc.shape}")
+
+# 2. Test Single C4.5 Tree
+print("\n--- Model 1: Single C4.5 Tree ---")
+t0 = time.time()
+single_tree_bc = build_c45_tree(
+    X_train_bc, y_train_bc,
+    max_depth=TREE_MAX_DEPTH,
+    min_samples=TREE_MIN_SAMP,
+    min_gain_ratio=TREE_MIN_GAIN,
+    random=False
+)
+print(f"Build time: {time.time() - t0:.4f}s")
+y_pred_single_bc = predict_tree(single_tree_bc, X_test_bc)
+acc_single_bc = accuracy(y_test_bc, y_pred_single_bc)
+print(f"Accuracy: {acc_single_bc:.4f}")
+
+cm_single_bc, classes_bc = confusion_matrix(y_test_bc, y_pred_single_bc)
+print("-------- confusion matrix --------")
+print(cm_single_bc)
+plot_confusion_matrix(cm_single_bc, classes_bc, title="Single C4.5 Tree — Breast Cancer")
+
+print("\n--- Model 2: Random Forest ---")
+t0 = time.time()
+rf_model_bc = train_ensemble(
+    X_train_bc, y_train_bc,
+    method='random_forest',
+    n_trees=N_TREES,
+    max_depth=None, 
+    min_samples=MIN_SAMPLES,
+    min_gain_ratio=MIN_GAIN_RATIO
+    max_workers=1
+)
+print(f"Build time: {time.time() - t0:.4f}s")
+y_pred_rf_bc = predict_ensemble(rf_model_bc, X_test_bc)
+acc_rf_bc = accuracy(y_test_bc, y_pred_rf_bc)
+print(f"Accuracy: {acc_rf_bc:.4f}")
+
+cm_rf_bc, _ = confusion_matrix(y_test_bc, y_pred_rf_bc, classes=classes_bc)
+print("-------- confusion matrix --------")
+print(cm_rf_bc)
+plot_confusion_matrix(cm_rf_bc, classes_bc, title="Random Forest — Breast Cancer")
+
+
+print("\n--- Model 3: AdaBoost ---")
+t0 = time.time()
+ada_model_bc = train_ensemble(
+    X_train_bc, y_train_bc,
+    method='adaboost',
+    n_estimators=ADA_LEARNERS,
+    stump_max_depth=ADA_STUMP_DEPTH
+)
+print(f"Build time: {time.time() - t0:.4f}s")
+y_pred_ada_bc = predict_ensemble(ada_model_bc, X_test_bc)
+acc_ada_bc = accuracy(y_test_bc, y_pred_ada_bc)
+print(f"Accuracy: {acc_ada_bc:.4f}")
+
+cm_ada_bc, _ = confusion_matrix(y_test_bc, y_pred_ada_bc, classes=classes_bc)
+print("-------- confusion matrix --------")
+print(cm_ada_bc)
+plot_confusion_matrix(cm_ada_bc, classes_bc, title="AdaBoost — Breast Cancer")
