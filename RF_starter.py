@@ -185,9 +185,8 @@ def build_c45_tree(X, y,available_attrs=None,depth=0,
     # Select candidate attributes
     if random and n_features_subset is not None:
         k = min(n_features_subset, len(available_attrs))
-        candidate_attrs = list(
-            np.random.choice(available_attrs, size=k, replace=False)
-        )
+        candidate_attrs = [int(a) for a in
+        np.random.choice(available_attrs, size=k, replace=False)]
     else:
         candidate_attrs = available_attrs  # full C4.5: consider all remaining
  
@@ -200,7 +199,7 @@ def build_c45_tree(X, y,available_attrs=None,depth=0,
         return node                  # no attribute improves enough — leaf
  
     # Split on best attribute
-    node.attribute = best_attr
+    node.attribute = int(best_attr)
     remaining_attrs = [a for a in available_attrs if a != best_attr]
  
     for val in np.unique(X[:, best_attr]):
@@ -225,7 +224,7 @@ def build_c45_tree(X, y,available_attrs=None,depth=0,
                 n_features_subset=n_features_subset,
                 sample_weights=w_sub,
             )
-        node.children[val] = child
+        node.children[int(val)]=child
  
     return node
 
@@ -234,7 +233,7 @@ def predict(node,x):
     #Classify x by traversing down, fall back to node label if new attribute
     if node.attribute is None or len(node.children) == 0:
         return node.label                    # leaf node
-    val = x[node.attribute]
+    val = int(x[node.attribute])
     if val in node.children:
         return predict(node.children[val], x)
     return node.label                        # unseen value — use majority fallback
@@ -362,7 +361,7 @@ def predict_random_forest(trees, X):
     Returns label array of shape (n_samples,).
     """
     # all_preds shape: (n_trees, n_samples)
-    all_preds = np.array([predict(tree, X) for tree in trees])
+    all_preds = np.array([predict_tree(tree, X) for tree in trees])
  
     def majority_vote(col):
         values, counts = np.unique(col, return_counts=True)
@@ -401,7 +400,7 @@ def train_adaboost(X, y, n_estimators=ADA_LEARNERS,stump_max_depth=ADA_STUMP_DEP
         )
  
         # ── Weighted error on full training set ───────────────────────────────
-        y_pred    = predict(stump, X)
+        y_pred    = predict_tree(stump,X)
         incorrect = (y_pred != y).astype(float)
         err_t     = float(np.dot(weights, incorrect))
  
@@ -430,7 +429,7 @@ def predict_adaboost(estimators, classes, X):
     class_to_idx = {int(c): i for i, c in enumerate(classes)}
     scores = np.zeros((len(X), len(classes)))
     for alpha, stump in estimators:
-        preds = predict(stump, X)
+        preds = predict_tree(stump,X)
         for i, p in enumerate(preds):
             if int(p) in class_to_idx:
                 scores[i, class_to_idx[int(p)]] += alpha
@@ -440,7 +439,7 @@ def predict_adaboost(estimators, classes, X):
 # ─────────────────────────────────────────────────────────────────────────────
 # UNIFIED ENSEMBLE INTERFACE  ← single function, controlled by METHOD_FLAG
 # ─────────────────────────────────────────────────────────────────────────────
-METHOD_FLAG='adaboost'
+METHOD_FLAG='random_forest'
 def train_ensemble(X, y, method=METHOD_FLAG, **kwargs):
     """
     Train an ensemble model.
@@ -518,11 +517,11 @@ single_tree = build_c45_tree(
 )
 print(f"Single tree build time: {time.time() - t0:.2f}s")
  
-y_pred_single = predict(single_tree, X_test_bin)
+y_pred_single = predict_tree(single_tree, X_test_bin)
 acc_single    = accuracy(y_test, y_pred_single)
 print(f"Accuracy of Single Tree: {acc_single:.4f}")
  
-cm_single, classes = confusion_matrix(y_test, y_pred_single)
+cm_single, classes = confusion_matrix(y_test, predict_tree(single_tree, X_test_bin))
 print("-------- confusion matrix --------")
 print(cm_single)
 plot_confusion_matrix(cm_single, classes, title="Single C4.5 Tree — MNIST")
